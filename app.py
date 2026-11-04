@@ -6,7 +6,6 @@ Ejecutar con:   streamlit run app.py
 """
 
 import io
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -153,8 +152,10 @@ def ruta_resultado(p):
 def leer_resultado(p):
     ruta = ruta_resultado(p)
     if ruta.exists():
-        with open(ruta, "rb") as f:
-            return pickle.load(f)
+        try:
+            return modelo.de_json(ruta.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001  archivo dañado o de otra versión
+            return None
     return None
 
 
@@ -469,8 +470,10 @@ if ejecutar:
         try:
             r = modelo.ejecutar(df, params,
                                 lambda f, m: barra.progress(min(max(f, 0.0), 1.0), text=m))
-            with open(ruta_resultado(params), "wb") as f:
-                pickle.dump(r, f)
+            try:
+                ruta_resultado(params).write_text(modelo.a_json(r), encoding="utf-8")
+            except Exception:  # noqa: BLE001  (p. ej. servidor sin permiso de escritura)
+                pass
             st.session_state.resultado = r
             barra.progress(1.0, text="Cálculo terminado")
             st.success("Cálculo terminado. Revise los resultados abajo.")

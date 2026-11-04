@@ -342,4 +342,43 @@ NIVELES = {
 def nombre_archivo(p: Parametros):
     import hashlib
     h = hashlib.md5(repr(p.clave()).encode()).hexdigest()[:12]
-    return f"resultado_{h}.pkl"
+    return f"resultado_{h}.json"
+
+
+# ----------------------------------------------------------------------
+# Guardado portable de resultados (JSON, no depende de la versión de pandas)
+# ----------------------------------------------------------------------
+def a_json(r):
+    import json
+    def df(d): return json.loads(d.to_json(orient="split", index=False))
+    def serie(s): return {"index": list(map(str, s.index)), "values": [float(v) for v in s.values]}
+    out = {k: v for k, v in r.items() if k not in
+           ("tabla", "movidas", "malla", "carga_actual", "cli_actual", "cargas", "clientes",
+            "eps2_vals", "eps5_vals", "params")}
+    out = {k: (v.item() if hasattr(v, "item") else v) for k, v in out.items()}
+    out.update(tabla=df(r["tabla"]), movidas=df(r["movidas"]), malla=df(r["malla"]),
+               carga_actual=serie(r["carga_actual"]), cli_actual=serie(r["cli_actual"]),
+               cargas={str(k): serie(v) for k, v in r["cargas"].items()},
+               clientes={str(k): serie(v) for k, v in r["clientes"].items()},
+               eps2_vals=[float(v) for v in r["eps2_vals"]],
+               eps5_vals=[float(v) for v in r["eps5_vals"]],
+               params={k: (list(v) if isinstance(v, tuple) else v) for k, v in r["params"].items()})
+    return json.dumps(out)
+
+
+def de_json(texto):
+    import json
+    d = json.loads(texto)
+    def df(x): return pd.DataFrame(x["data"], columns=x["columns"])
+    def serie(x): return pd.Series(x["values"], index=x["index"], dtype=float)
+    d["tabla"], d["movidas"], d["malla"] = df(d["tabla"]), df(d["movidas"]), df(d["malla"])
+    d["tabla"]["pareto"] = d["tabla"]["pareto"].astype(bool)
+    d["tabla"]["sol"] = d["tabla"]["sol"].astype(int)
+    if len(d["movidas"]):
+        d["movidas"]["sol"] = d["movidas"]["sol"].astype(int)
+    d["carga_actual"], d["cli_actual"] = serie(d["carga_actual"]), serie(d["cli_actual"])
+    d["cargas"] = {int(k): serie(v) for k, v in d["cargas"].items()}
+    d["clientes"] = {int(k): serie(v) for k, v in d["clientes"].items()}
+    d["eps2_vals"], d["eps5_vals"] = np.array(d["eps2_vals"]), np.array(d["eps5_vals"])
+    d["params"]["olts"] = tuple(d["params"]["olts"])
+    return d

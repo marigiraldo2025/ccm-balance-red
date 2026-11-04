@@ -1,6 +1,6 @@
 """Calcula y guarda los resultados de los tres niveles con los parámetros por defecto,
 para que la aplicación los muestre al instante."""
-import pickle, sys, time
+import sys, time
 from pathlib import Path
 import modelo
 
@@ -13,5 +13,5 @@ for nivel in niveles:
     t = time.time()
     r = modelo.ejecutar(df, p, lambda f, m: print(f"[{nivel}] {f:.0%} {m}", flush=True))
     destino = AQUI / "resultados_guardados" / modelo.nombre_archivo(p)
-    pickle.dump(r, open(destino, "wb"))
+    destino.write_text(modelo.a_json(r), encoding="utf-8")
     print(f"[{nivel}] guardado en {destino.name} ({time.time() - t:.0f} s)", flush=True)
